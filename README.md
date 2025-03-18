@@ -26,14 +26,12 @@
 
 ```
 vagrant up
-
 ```
 
 Запуск плейбука:
 
 ```
 ansible-playbook playbook.yml
-
 ```
 
 Конфигурирование:
