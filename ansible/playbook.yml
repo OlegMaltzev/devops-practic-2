@@ -1,0 +1,12 @@
+---
+- hosts: "all"
+  become: true
+  vars_files:
+    - ./vars/defaults.yml
+
+  roles: 
+    - prometheus
+    - node_exporter
+    - opensearch
+    - fluentbit
+    

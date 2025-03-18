@@ -1,0 +1,40 @@
+- name: Add Fluent Bit GPG key
+  rpm_key:
+    state: present
+    key: https://packages.fluentbit.io/fluentbit.key
+
+- name: Add Fluent Bit repository
+  yum_repository:
+    name: Fluent Bit
+    description: Fluent Bit repository
+    baseurl: https://packages.fluentbit.io/centos/$releasever/
+    gpgcheck: yes
+    enabled: yes
+    gpgkey: https://packages.fluentbit.io/fluentbit.key
+
+- name: Install Fluent Bit
+  yum:
+    name: fluent-bit
+    state: present
+
+- name: Configure Fluent Bit
+  template:
+    src: fluent-bit.conf.j2
+    dest: /etc/fluent-bit/fluent-bit.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Fluent Bit
+
+- name: Enable and start Fluent Bit service
+  systemd:
+    name: fluent-bit
+    enabled: yes
+    state: started
+
+- name: Ensure Fluent Bit is running
+  wait_for:
+    port: 9200
+    delay: 10
+    timeout: 60
+    state: started

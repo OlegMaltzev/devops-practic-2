@@ -1,0 +1,84 @@
+- name: Take temp file name
+  set_fact:
+    tmp_node_exporter_filename: "{{ node_exporter_download_link | basename }}"
+
+- name: Take temp directory name
+  set_fact:
+    tmp_node_exporter_dirname: "{{ tmp_node_exporter_filename | regex_replace('\\.[^\\.]+$', '') | regex_replace('\\.[^\\.]+$', '') }}"
+
+- name: Download Node Exporter
+  get_url:
+    url: '{{ node_exporter_download_link }}'
+    dest: '/tmp/{{ tmp_node_exporter_filename }}'
+    mode: '0755'
+
+- name: Unarchive node exporter
+  unarchive:
+    src: '/tmp/{{ tmp_node_exporter_filename }}'
+    dest: /tmp/
+    remote_src: yes 
+
+- name: Copy node exporter binarie to /usr/local/bin
+  copy:
+    src: '/tmp/{{ tmp_node_exporter_dirname }}/node_exporter'
+    dest: /usr/local/bin/
+    follow: yes
+    remote_src: yes
+
+- name: Clean up
+  file:
+    path: '/tmp/{{ item }}'
+    state: absent
+  loop:
+    - '{{ tmp_node_exporter_filename }}'
+    - '{{ tmp_node_exporter_dirname }}'
+
+- name: Create a user for node exporter
+  ansible.builtin.user:
+    name: nodeusr
+    create_home: no
+    shell: /bin/false
+
+- name: Set owner for /usr/local/bin/node_exporter
+  file:
+    path: /usr/local/bin/node_exporter
+    owner: nodeusr
+    group: nodeusr
+    mode: '0755'
+
+- name: Copy service file
+  copy:
+    src: files/node_exporter.service
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart node_exporter
+
+- name: Reload systemd daemon to apply changes
+  systemd:
+    daemon_reload: yes
+
+- name: Start node_exporter service
+  systemd:
+    name: node_exporter.service
+    state: started
+    enabled: yes
+
+- name: Ensure node_exporter is running
+  wait_for:
+    port: 9100
+    delay: 10
+    timeout: 60
+    state: started
+
+- name: Add node_exporter job to Prometheus config
+  replace:
+    path: /etc/prometheus/prometheus.yml
+    regexp: '^(scrape_configs:)'
+    replace: |-
+      \1
+        - job_name: 'node_exporter'
+          static_configs:
+            - targets: ['localhost:9100']
+  notify: Restart prometheus

@@ -1,0 +1,102 @@
+#- name: Install Java (required for opensearch?)
+#  yum:
+#    name: java-openjdk
+#    update_cache: yes
+#    state: latest
+
+- name: Download OpenSearch repository file
+  get_url:
+    url: https://artifacts.opensearch.org/releases/bundle/opensearch/2.x/opensearch-2.x.repo
+    dest: /etc/yum.repos.d/opensearch-2.x.repo
+    mode: '0644'
+
+- name: Download OpenSearch-dashboards repository file
+  get_url:
+    url: https://artifacts.opensearch.org/releases/bundle/opensearch-dashboards/2.x/opensearch-dashboards-2.x.repo
+    dest: /etc/yum.repos.d/opensearch-dashboards-2.x.repo
+    mode: '0644'
+
+- name: Update YUM cache
+  yum:
+    update_cache: yes
+
+- name: Install OpenSearch
+  yum:
+    name: "opensearch-{{ opensearch_version }}"
+    state: present
+
+- name: Install OpenSearch-dashboard
+  yum:
+    name: "opensearch-dashboards-{{ opensearch_dashboards_version }}"
+    state: present
+
+- name: Ensure network.host is set to 0.0.0.0 in opensearch.yml
+  lineinfile:
+    path: /etc/opensearch/opensearch.yml
+    regexp: '^network\.host:'
+    line: 'network.host: 0.0.0.0'
+    state: present
+  notify: Restart opensearch
+
+- name: Ensure plugins.security.disabled is set to true in opensearch.yml
+  lineinfile:
+    path: /etc/opensearch/opensearch.yml
+    regexp: '^plugins\.security\.disabled:'
+    line: 'plugins.security.disabled: true'
+    state: present
+  notify: Restart opensearch
+
+- name: Ensure discovery.type is set to single-node in opensearch.yml
+  lineinfile:
+    path: '/etc/opensearch/opensearch.yml'
+    regexp: '^discovery\.type:'
+    line: 'discovery.type: single-node'
+    state: present
+  notify: Restart opensearch
+
+- name: Copy opensearch-dashboards config file to /etc/opensearch-dashboards/opensearch_dashboards.yml
+  copy:
+    src: files/opensearch_dashboards.yml
+    dest: /etc/opensearch-dashboards/
+    owner: opensearch-dashboards
+    group: opensearch-dashboards
+    mode: '0640'
+    follow: yes
+  notify: Restart opensearch-dashboards
+
+- name: Get list of installed plugins OpenSearch Dashboards
+  command: /usr/share/opensearch-dashboards/bin/opensearch-dashboards-plugin list --allow-root
+  register: plugin_list
+  changed_when: false  
+
+- name: Remove securityDashboards plugin only if it is installed because otherwise an error occurs
+  command: /usr/share/opensearch-dashboards/bin/opensearch-dashboards-plugin remove securityDashboards --allow-root
+  when: "'securityDashboards' in plugin_list.stdout"
+  notify: Restart opensearch-dashboards
+
+- name: Enable and start opensearch service
+  systemd:
+    name: opensearch
+    enabled: yes
+    state: started
+
+- name: Enable and start opensearch-dashboards service
+  systemd:
+    name: opensearch-dashboards
+    enabled: yes
+    state: started
+
+- name: Ensure opensearch is running
+  wait_for:
+    port: 9200
+    delay: 10
+    timeout: 60
+    state: started
+
+- name: Ensure opensearch-dashboards is running
+  wait_for:
+    port: 5601
+    delay: 10
+    timeout: 180
+    state: started
+

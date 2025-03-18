@@ -1,0 +1,7 @@
+---
+prometheus_download_link: "https://github.com/prometheus/prometheus/releases/download/v2.53.3/prometheus-2.53.3.linux-amd64.tar.gz"
+
+node_exporter_download_link: "https://github.com/prometheus/node_exporter/releases/download/v1.9.0/node_exporter-1.9.0.linux-amd64.tar.gz"
+
+opensearch_version: 2.19.1-1
+opensearch_dashboards_version: 2.19.1-1

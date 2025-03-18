@@ -1,0 +1,131 @@
+- name: Disable SELinux
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+
+- name: permit port 9090/tcp for prometheus server
+  ansible.posix.firewalld:
+    port: 9090/tcp
+    permanent: true
+    state: enabled
+
+- name: permit port 9100/tcp for Node Exporter
+  ansible.posix.firewalld:
+    port: 9100/tcp
+    permanent: true
+    state: enabled
+
+- name: permit port 5601/tcp for opensearch-dashboards
+  ansible.posix.firewalld:
+    port: 5601/tcp
+    permanent: true
+    state: enabled
+
+- name: Reload firewalld
+  ansible.builtin.service:
+    name: firewalld
+    state: reloaded
+
+- name: Take temp file name
+  set_fact:
+    tmp_prometheus_filename: "{{ prometheus_download_link | basename }}"
+
+- name: Take temp directory name
+  set_fact:
+    tmp_prometheus_dirname: "{{ tmp_prometheus_filename | regex_replace('\\.[^\\.]+$', '') | regex_replace('\\.[^\\.]+$', '') }}"
+
+- name: Download Prometheus
+  get_url:
+    url: '{{ prometheus_download_link }}'
+    dest: '/tmp/{{ tmp_prometheus_filename }}'
+    mode: '0755'
+
+- name: Unarchive Prometheus
+  unarchive:
+    src: '/tmp/{{ tmp_prometheus_filename }}'
+    dest: /tmp/
+    remote_src: yes 
+
+- name: Copy prometheus binaries to /usr/local/bin
+  copy:
+    src: '{{item}}'
+    dest: /usr/local/bin/
+    follow: yes
+    remote_src: yes
+  loop:
+    - '/tmp/{{ tmp_prometheus_dirname }}/promtool'
+    - '/tmp/{{ tmp_prometheus_dirname }}/prometheus'
+
+- name: Copy prometheus config file to /etc/prometheus
+  copy:
+    src: files/prometheus.yml
+    dest: /etc/prometheus/
+    follow: yes
+  notify: Restart prometheus
+
+- name: Clean up
+  file:
+    path: '/tmp/{{ item }}'
+    state: absent
+  loop:
+    - '{{ tmp_prometheus_filename }}'
+    - '{{ tmp_prometheus_dirname }}'
+
+- name: Сreate directory /var/lib/prometheus
+  file:
+    path=/var/lib/prometheus
+    state=directory
+
+- name: Create a user from which we will launch the monitoring system
+  ansible.builtin.user:
+    name: prometheus
+    create_home: no
+    shell: /bin/false
+
+- name: Set owner for prometheus directories
+  file:
+    path: "{{ item }}"
+    owner: prometheus
+    group: prometheus
+    recurse: yes 
+  loop:
+    - /var/lib/prometheus
+    - /etc/prometheus
+
+- name: Set owner for /usr/local/bin/prometheus и /usr/local/bin/promtool
+  file:
+    path: "{{ item }}"
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+  loop:
+    - /usr/local/bin/prometheus
+    - /usr/local/bin/promtool
+
+- name: Copy service file
+  copy:
+    src: files/prometheus.service
+    dest: /etc/systemd/system/prometheus.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart prometheus
+
+- name: Reload systemd daemon to apply changes
+  systemd:
+    daemon_reload: yes
+
+- name: Start prometheus service
+  systemd:
+    name: prometheus.service
+    state: started
+    enabled: yes
+
+- name: Ensure prometheus is running
+  wait_for:
+    port: 9090
+    delay: 10
+    timeout: 60
+    state: started
+
+

@@ -1,0 +1,32 @@
+[SERVICE]
+    flush        5
+    daemon       Off
+    log_level    info
+    parsers_file parsers.conf
+    plugins_file plugins.conf
+    http_server  Off
+
+[INPUT]   
+    Name          systemd
+    Tag           host.*
+    Systemd_Filter  _SYSTEMD_UNIT=prometheus.service
+    Systemd_Filter  _SYSTEMD_UNIT=node_exporter.service
+    Systemd_Filter  _SYSTEMD_UNIT=opensearch.service
+    Systemd_Filter  _SYSTEMD_UNIT=opensearch-dashboards.service
+    Systemd_Filter  _SYSTEMD_UNIT=fluent-bit.service
+    interval_sec 5
+
+[OUTPUT]
+    Name  opensearch
+    Match *
+    Host 127.0.0.1
+    Port 9200
+    HTTP_User kibanaserver
+    HTTP_Passwd kibanaserver
+    Index fluent-bit
+
+
+
+
+
+
