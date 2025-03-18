@@ -24,10 +24,12 @@
 
 Запуск VM с CentOS Stream 9
 ```vagrant up
+
 ```
 
 Запуск плейбука:
 ```ansible-playbook playbook.yml
+
 ```
 
 Конфигурирование:
