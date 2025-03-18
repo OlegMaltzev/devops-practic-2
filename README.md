@@ -12,7 +12,7 @@
 - FluentBit 
 
 
-## Роли:
+## Роли
 
 - prometheus: установка и настройка Prometheus
 - node_exporter: установка и настройка Node Exporter, добавление в конфиг - Prometheus  
